@@ -151,14 +151,13 @@ void process_image(int pgmfile, char *file_in, char *file_out, int width, int he
 
 
 
-  /* This simply inverts the colors
+  /* This simply inverts the colors */
   
   for (j=0;j<height;j++) {
     for (i=0;i<width;i++) {
       image_out[j][i] = 255 - image_in[j][i];
     }
   }
-  */
 
   /* write output image */
 
@@ -171,6 +170,65 @@ void process_image(int pgmfile, char *file_in, char *file_out, int width, int he
   }
 }
 
-int** convolve(char** image_in, int mask_one, int width, int height) {
+int** convolve(char** image_in, int** mask_one, int width, int height) {
   
+  /* Copy of input image with extra height and width for working */
+  int** work_image;
+  
+  /* Results of convolution will be saved to this 2D array */
+  int** out_image;
+  
+  int new_width;
+  int new_height;
+  int temp;
+  
+  new_width = width + 1;
+  new_height = height + 1;
+  temp = 0; // Temp initialise value
+  
+  /* Allocate memory for workable image */
+  work_image = malloc(new_height * sizeof(int*));
+  for (int i = 0; i < height; i++) {
+    work_image[i] = malloc(new_width * sizeof(int));
+  }
+  
+  /* Copy image to workable copy and extend column and row by 1 pixel */
+  for (int i = 0; i < new_height; i++) {
+    for (int j = 0; i < new_width; j++) {
+      
+      if ( (i == new_height) && (j == new_width) ) { /* Are we at the bottom right corner? */
+        work_image[i][j] = image_in[i-1][j-1];
+      }
+      else if ( i == new_height ) { /* Are we at the bottom row? */
+        work_image[i][j] = image_in[i-1][j];
+      }
+      else if ( j == new_width ) { /* Are we at the far right column? */
+        work_image[i][j] = image_in[i][j-1];
+      } 
+      else {
+        work_image[i][j] = image_in[i][j];
+      }
+    }
+  }
+  
+  /* Allocate memory for output int** */
+  out_image = malloc(height * sizeof(int*));
+  for (int i = 0; i < height; i++) {
+    out_image[i] = malloc(width * sizeof(int));
+  }
+  
+  int w, x, y, z;
+  
+  for (int i = 0; i < height + 1; i++) {
+    for (int j = 0; j < width + 1; j++) {
+      temp = ( ((work_image[i][j] * mask_one[0][0]) - (work_image[i+1][j+1] * mask_one[1][1])) + ((work_image[i][j] * mask_one[0][0]) - (work_image[i+1][j+1] * mask_one[1][1])) )
+      w = work_image[i][j];
+      x = work_image[i][j+1];
+      y = work_image[i+1][j];
+      z = work_image[i+1][j+1];
+      out_image[i][j] = temp;
+    }
+  }
+  
+  return out_image;
 }
