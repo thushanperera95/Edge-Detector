@@ -224,7 +224,7 @@ int** convolve(unsigned char** image_in, int** mask, int width, int height) {
   printf("new height = %d, new width = %d\n", new_height, new_width);
   for (int i = 0; i < new_height; i++) {
     printf("i = %d\n", i);
-    for (int j = 0; i < new_width; j++) {
+    for (int j = 0; j < new_width; j++) {
       printf("j = %d\n", j);
       if ( (i == new_height) && (j == new_width) ) { /* Are we at the bottom right corner? */
         work_image[i][j] = (int)image_in[i-1][j-1];

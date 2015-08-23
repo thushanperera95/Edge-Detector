@@ -32,3 +32,4 @@
 *.dSYM/
 *.o
 lena3.pgm
+*.o
