@@ -6,14 +6,16 @@ INCLUDES = -I.
 
 LFLAGS = -L. -lm
 
-CFLAGS = -ansi -Wall -pedantic -std=c99 -O -g $(INCLUDES)
+CFLAGS = -ansi -Wall -pedantic -std=c99 -g $(INCLUDES)
+
+OPTIMISE = -O
 
 CC = gcc
 
 EXEC = process
 
 $(EXEC): $(OBJ)
-	$(CC) -o $(EXEC) $(OBJ) $(LFLAGS)
+	$(CC) -o $(EXEC) $(OBJ) $(LFLAGS) $(CFLAGS)
 
 all: $(EXEC)
 

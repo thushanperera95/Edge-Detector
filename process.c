@@ -13,6 +13,7 @@
 #define DEFAULT_SIZE 512
 
 void process_image(int, char *, char *, int, int);
+int** convolve(unsigned char** image_in, int** mask, int width, int height);
 
 /* get options and input/output filename from user */
 
@@ -117,7 +118,6 @@ int main(int argc, char *argv[])
 void process_image(int pgmfile, char *file_in, char *file_out, int width, int height)
 {
 
-  int i,j;
   unsigned char **image_in;  /* specify image array - char image */
   unsigned char **image_out;  /* specify image array - char image */
   struct pgmfile pg;
@@ -148,16 +148,43 @@ void process_image(int pgmfile, char *file_in, char *file_out, int width, int he
   image_out = malloc_char_image(width,height);
   
   /** Do the extra processing here */
+  int** mask_one;
+  int** mask_two;
+  
+  mask_one = malloc(2 * sizeof(int*));
+  mask_two = malloc(2 * sizeof(int*));
+  for (int i = 0; i < 2; i++) {
+    mask_one[i] = malloc(2 * sizeof(int));
+    mask_two[i] = malloc(2 * sizeof(int));
+  }
+  
+  mask_one[0][0] = 1;
+  mask_one[0][1] = 0;
+  mask_one[1][0] = 0;
+  mask_one[1][1] = -1;
+  
+  mask_two[0][0] = 0;
+  mask_two[0][1] = 1;
+  mask_two[1][0] = -1;
+  mask_two[1][1] = 0;
+  
+  int** nesw = convolve(image_in, mask_one, width, height);
+  int** nwse = convolve(image_in, mask_two, width, height);
 
-
+  printf("Got here before the final image out write\n");
+  for (int i = 0; i < height; i++) {
+    for (int j = 0; j < width; j++) {
+      image_out[i][j] = abs(nesw[i][j]) + abs(nwse[i][j]);
+    }
+  }
 
   /* This simply inverts the colors */
   
-  for (j=0;j<height;j++) {
-    for (i=0;i<width;i++) {
+  /*for (int j=0;j<height;j++) {
+    for (int i=0;i<width;i++) {
       image_out[j][i] = 255 - image_in[j][i];
     }
-  }
+  }*/
 
   /* write output image */
 
@@ -170,7 +197,7 @@ void process_image(int pgmfile, char *file_in, char *file_out, int width, int he
   }
 }
 
-int** convolve(char** image_in, int** mask_one, int width, int height) {
+int** convolve(unsigned char** image_in, int** mask, int width, int height) {
   
   /* Copy of input image with extra height and width for working */
   int** work_image;
@@ -191,44 +218,45 @@ int** convolve(char** image_in, int** mask_one, int width, int height) {
   for (int i = 0; i < height; i++) {
     work_image[i] = malloc(new_width * sizeof(int));
   }
+  printf("Malloced workable image\n");
   
   /* Copy image to workable copy and extend column and row by 1 pixel */
+  printf("new height = %d, new width = %d\n", new_height, new_width);
   for (int i = 0; i < new_height; i++) {
+    printf("i = %d\n", i);
     for (int j = 0; i < new_width; j++) {
-      
+      printf("j = %d\n", j);
       if ( (i == new_height) && (j == new_width) ) { /* Are we at the bottom right corner? */
-        work_image[i][j] = image_in[i-1][j-1];
+        work_image[i][j] = (int)image_in[i-1][j-1];
       }
       else if ( i == new_height ) { /* Are we at the bottom row? */
-        work_image[i][j] = image_in[i-1][j];
+        work_image[i][j] = (int)image_in[i-1][j];
       }
       else if ( j == new_width ) { /* Are we at the far right column? */
-        work_image[i][j] = image_in[i][j-1];
+        work_image[i][j] = (int)image_in[i][j-1];
       } 
       else {
-        work_image[i][j] = image_in[i][j];
+        work_image[i][j] = (int)image_in[i][j];
       }
     }
   }
+  printf("Copied image to workable and extend\n");
   
   /* Allocate memory for output int** */
   out_image = malloc(height * sizeof(int*));
   for (int i = 0; i < height; i++) {
     out_image[i] = malloc(width * sizeof(int));
   }
+  printf("Mallocd output image\n");
   
-  int w, x, y, z;
-  
-  for (int i = 0; i < height + 1; i++) {
-    for (int j = 0; j < width + 1; j++) {
-      temp = ( ((work_image[i][j] * mask_one[0][0]) - (work_image[i+1][j+1] * mask_one[1][1])) + ((work_image[i][j] * mask_one[0][0]) - (work_image[i+1][j+1] * mask_one[1][1])) )
-      w = work_image[i][j];
-      x = work_image[i][j+1];
-      y = work_image[i+1][j];
-      z = work_image[i+1][j+1];
+  for (int i = 0; i < height; i++) {
+    for (int j = 0; j < width; j++) {
+      /* Get pixel and the neighbours and then apply onto the mask matrix */
+      temp = ( ((work_image[i][j] * mask[0][0]) + (work_image[i+1][j+1] * mask[1][1])) - ((work_image[i][j] * mask[0][0]) + (work_image[i+1][j+1] * mask[1][1])) );
       out_image[i][j] = temp;
     }
   }
+  printf("Convolution\n");
   
   return out_image;
 }
