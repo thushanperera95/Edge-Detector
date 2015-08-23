@@ -149,11 +149,16 @@ void process_image(int pgmfile, char *file_in, char *file_out, int width, int he
   
   /** Do the extra processing here */
 
+
+
+  /* This simply inverts the colors
+  
   for (j=0;j<height;j++) {
     for (i=0;i<width;i++) {
       image_out[j][i] = 255 - image_in[j][i];
     }
   }
+  */
 
   /* write output image */
 
@@ -164,4 +169,8 @@ void process_image(int pgmfile, char *file_in, char *file_out, int width, int he
   {
     write_image(image_out, file_out, width, height);
   }
+}
+
+int** convolve(char** image_in, int mask_one, int width, int height) {
+  
 }
