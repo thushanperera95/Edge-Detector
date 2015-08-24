@@ -170,11 +170,17 @@ void process_image(int pgmfile, char *file_in, char *file_out, int width, int he
   
   int** nesw = convolve(image_in, mask_one, width, height);
   int** nwse = convolve(image_in, mask_two, width, height);
+  int temp;
+  int threshold = 170;
 
   printf("Got here before the final image out write\n");
   for (int i = 0; i < height; i++) {
     for (int j = 0; j < width; j++) {
-      image_out[i][j] = abs(nesw[i][j]) + abs(nwse[i][j]);
+       temp = abs(nesw[i][j]) + abs(nwse[i][j]);
+       if (temp > threshold) {
+         temp = threshold;
+       }
+       image_out[i][j] = (unsigned char)temp;
     }
   }
 
@@ -215,7 +221,7 @@ int** convolve(unsigned char** image_in, int** mask, int width, int height) {
   
   /* Allocate memory for workable image */
   work_image = malloc(new_height * sizeof(int*));
-  for (int i = 0; i < height; i++) {
+  for (int i = 0; i < new_height; i++) {
     work_image[i] = malloc(new_width * sizeof(int));
   }
   printf("Malloced workable image\n");
@@ -223,16 +229,18 @@ int** convolve(unsigned char** image_in, int** mask, int width, int height) {
   /* Copy image to workable copy and extend column and row by 1 pixel */
   printf("new height = %d, new width = %d\n", new_height, new_width);
   for (int i = 0; i < new_height; i++) {
-    printf("i = %d\n", i);
+        printf("i = %d\n", i);
     for (int j = 0; j < new_width; j++) {
-      printf("j = %d\n", j);
-      if ( (i == new_height) && (j == new_width) ) { /* Are we at the bottom right corner? */
+        if (i == height)
+            printf("j = %d\n", j);
+      if ( (i == height) && (j == width) ) { /* Are we at the bottom right corner? */
         work_image[i][j] = (int)image_in[i-1][j-1];
       }
-      else if ( i == new_height ) { /* Are we at the bottom row? */
+      else if ( i == height ) { /* Are we at the bottom row? */
+        printf("Here\n");
         work_image[i][j] = (int)image_in[i-1][j];
       }
-      else if ( j == new_width ) { /* Are we at the far right column? */
+      else if ( j == width ) { /* Are we at the far right column? */
         work_image[i][j] = (int)image_in[i][j-1];
       } 
       else {
@@ -252,7 +260,11 @@ int** convolve(unsigned char** image_in, int** mask, int width, int height) {
   for (int i = 0; i < height; i++) {
     for (int j = 0; j < width; j++) {
       /* Get pixel and the neighbours and then apply onto the mask matrix */
-      temp = ( ((work_image[i][j] * mask[0][0]) + (work_image[i+1][j+1] * mask[1][1])) - ((work_image[i][j] * mask[0][0]) + (work_image[i+1][j+1] * mask[1][1])) );
+      int w = work_image[i][j];
+      int x = work_image[i][j+1];
+      int y = work_image[i+1][j];
+      int z = work_image[i+1][j+1];
+      temp = ( ((w * mask[0][0]) + (z * mask[1][1])) - ((x * mask[0][1]) + (y * mask[1][0])) );
       out_image[i][j] = temp;
     }
   }
