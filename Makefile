@@ -20,4 +20,4 @@ $(EXEC): $(OBJ)
 all: $(EXEC)
 
 clean:
-	rm -f *.o $(EXEC) core
+	rm -f *.o *.exe $(EXEC) core
