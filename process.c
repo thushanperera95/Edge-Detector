@@ -13,7 +13,8 @@
 #define DEFAULT_SIZE 512
 
 void process_image(int, char *, char *, int, int);
-int** convolve(unsigned char** image_in, int** mask, int width, int height);
+int** convolve_sobel(unsigned char** image_in, int** mask, int width, int height);
+int** convolve_roberts_cross(unsigned char** image_in, int** mask, int width, int height);
 
 /* get options and input/output filename from user */
 
@@ -158,6 +159,16 @@ void process_image(int pgmfile, char *file_in, char *file_out, int width, int he
     mask_two[i] = malloc(2 * sizeof(int));
   }
   
+  int** smask_one;
+  int** smask_two;
+  
+  smask_one = malloc(3 * sizeof(int*));
+  smask_two = malloc(3 * sizeof(int*));
+  for (int i = 0; i < 3; i++) {
+    mask_one[i] = malloc(3 * sizeof(int));
+    mask_two[i] = malloc(3 * sizeof(int));
+  }
+  
   mask_one[0][0] = 1;
   mask_one[0][1] = 0;
   mask_one[1][0] = 0;
@@ -168,10 +179,49 @@ void process_image(int pgmfile, char *file_in, char *file_out, int width, int he
   mask_two[1][0] = -1;
   mask_two[1][1] = 0;
   
-  int** nesw = convolve(image_in, mask_one, width, height);
-  int** nwse = convolve(image_in, mask_two, width, height);
+  
+  printf("f\n");
+  smask_one[0][0] = -1;
+  smask_one[0][1] = 0;
+  smask_one[0][2] = 1;
+  smask_one[1][0] = -2;
+  smask_one[1][1] = 0;
+  smask_one[1][2] = 2;
+  smask_one[2][0] = -1;
+  smask_one[2][1] = 0;
+  smask_one[2][2] = 1;
+  
+  
+  printf("f2\n");
+  smask_two[0][0] = 1;
+  smask_two[0][1] = 2;
+  smask_two[0][2] = 1;
+  smask_two[1][0] = 0;
+  smask_two[1][1] = 0;
+  smask_two[1][2] = 0;
+  smask_two[2][0] = -1;
+  smask_two[2][1] = -2;
+  smask_two[2][2] = -1;
+  
+  // int** nesw = convolve_roberts_cross(image_in, mask_one, width, height);
+  // int** nwse = convolve_roberts_cross(image_in, mask_two, width, height);
+  // int temp;
+  // int threshold = 255;
+
+  // for (int i = 0; i < height; i++) {
+  //   for (int j = 0; j < width; j++) {
+  //      temp = abs(nesw[i][j]) + abs(nwse[i][j]);
+  //      if (temp > threshold) {
+  //        temp = threshold;
+  //      }
+  //      image_out[i][j] = (unsigned char)temp;
+  //   }
+  // }
+  
+  int** nesw = convolve_sobel(image_in, smask_one, width, height);
+  int** nwse = convolve_sobel(image_in, smask_two, width, height);
   int temp;
-  int threshold = 255;
+  int threshold = 127;
 
   for (int i = 0; i < height; i++) {
     for (int j = 0; j < width; j++) {
@@ -194,7 +244,85 @@ void process_image(int pgmfile, char *file_in, char *file_out, int width, int he
   }
 }
 
-int** convolve(unsigned char** image_in, int** mask, int width, int height) {
+int** convolve_sobel(unsigned char** image_in, int** mask, int width, int height) {
+  
+  /* Copy of input image with extra height and width for working */
+  int** work_image;
+  
+  /* Results of convolution will be saved to this 2D array */
+  int** out_image;
+  
+  int new_width;
+  int new_height;
+  int temp;
+  
+  new_width = width + 2;
+  new_height = height + 2;
+  temp = 0; // Temp initialise value
+  
+  /* Allocate memory for workable image */
+  work_image = malloc(new_height * sizeof(int*));
+  for (int i = 0; i < new_height; i++) {
+    work_image[i] = malloc(new_width * sizeof(int));
+  }
+  
+  /* Copy image to workable copy and extend column and row by 1 pixel */
+  for (int i = 0; i < new_height; i++) {
+    for (int j = 0; j < new_width; j++) {
+      
+      if ( (i == height) && (j == width) ) { /* Are we at the bottom right corner? */
+        work_image[i][j] = (int)image_in[i-1][j-1];
+      }
+      else if ( i == height ) { /* Are we at the bottom row? */
+        work_image[i][j] = (int)image_in[i-1][j];
+      }
+      else if ( j == width ) { /* Are we at the far right column? */
+        work_image[i][j] = (int)image_in[i][j-1];
+      }
+      else if ( (i == 0) && (j == 0) ) { /* Are we at the top left corner? */
+        work_image[i][j] = (int)image_in[i+1][j+1];
+      }
+      else if ( i == 0 ) { /* Are we at the top row? */
+        work_image[i][j] = (int)image_in[i+1][j];
+      }
+      else if ( j == 0 ) { /* Are we at the far left column? */
+        work_image[i][j] = (int)image_in[i][j+1];
+      } 
+      else {
+        work_image[i][j] = (int)image_in[i][j];
+      }
+    }
+  }
+  printf("Got here\n");
+  
+  /* Allocate memory for output int** */
+  out_image = malloc(height * sizeof(int*));
+  for (int i = 0; i < height; i++) {
+    out_image[i] = malloc(width * sizeof(int));
+  }
+  
+  for (int i = 0; i < height; i++) {
+    for (int j = 0; j < width; j++) {
+      
+      /* Get pixel and the neighbours and then apply onto the mask matrix */
+      int nw = work_image[i][j];
+      int n = work_image[i][j+1];
+      int ne = work_image[i][j+2];
+      int w = work_image[i+1][j];
+      int c = work_image[i+1][j+1];
+      int e = work_image[i+1][j+2];
+      int sw = work_image[i+2][j];
+      int s = work_image[i+2][j+1];
+      int se = work_image[i+2][j+2];
+      temp = (nw*mask[0][0]) + (n*mask[0][1]) + (ne*mask[0][2])+(w*mask[1][0])+(c*mask[1][1])+(e*mask[1][2])+(sw*mask[2][0])+(s*mask[2][1])+(se*mask[2][2]);
+      out_image[i][j] = temp;
+    }
+  }
+  
+  return out_image;
+}
+
+int** convolve_roberts_cross(unsigned char** image_in, int** mask, int width, int height) {
   
   /* Copy of input image with extra height and width for working */
   int** work_image;
