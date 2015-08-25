@@ -12,3 +12,11 @@ Build:
 Usage:
   ./process -p <input file name>.pgm -o <output file name>.pgm [-s]
   -s parameter to enable Sobel. The default is Robert's Cross.
+
+Examples:
+
+  ![Alt text](img/lena.png?raw=true "Lena Original")
+  
+  ![Alt text](img/LenaRobertsCross.png?raw=true "Lena with Robert's Cross")
+  
+  ![Alt text](img/LenaSobel.png?raw=true "Lena with Sobel")
