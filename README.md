@@ -15,8 +15,11 @@ Usage:
 
 Examples:
 
+  Lena Original
   ![Alt text](img/lena.png?raw=true "Lena Original")
   
+  Lena with Robert's Cross
   ![Alt text](img/LenaRobertsCross.png?raw=true "Lena with Robert's Cross")
   
+  Lena with Sobel
   ![Alt text](img/LenaSobel.png?raw=true "Lena with Sobel")
