@@ -1,386 +1,323 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <math.h>
-
-#include "pgmfile.h"
-#include "malloc_image.h"
-
-#define BLACK 0
-#define WHITE 255
-#define FALSE 0
-#define TRUE !FALSE
-#define DEFAULT_SIZE 512
-
-void process_image(int, char *, char *, int, int);
-int** convolve_sobel(unsigned char** image_in, int** mask, int width, int height);
-int** convolve_roberts_cross(unsigned char** image_in, int** mask, int width, int height);
-
-/* get options and input/output filename from user */
-
-int main(int argc, char *argv[])
-{
-
-  FILE *fp_in, *fp_out;
-  char *temp, ch;
-  int set_file_in, set_file_out, count;
-  int width, height;
-  char file_in[255], file_out[255];
-  int pgmfile;
-
-  width = DEFAULT_SIZE;
-  height = DEFAULT_SIZE; 
-  set_file_in = FALSE;
-  set_file_out = FALSE;
-
-  pgmfile = FALSE;
-
-  if (argc > 1) {
-    count = 0;
-    do { 
-         count++;
-         temp = argv[count];
-         if (*argv[count] == '-') {
-           ch = *(++temp);
-           switch (ch) {
-           case 'i' :
-            	     count++;
-                     strcpy(file_in, argv[count]);
-                     set_file_in = TRUE;
-                     pgmfile = FALSE;
-                     break;
-           case 'p' :
-            	     count++;
-                     strcpy(file_in, argv[count]);
-                     set_file_in = TRUE;
-                     pgmfile = TRUE;
-                     break;
-           case 'o' :
-            	     count++;
-                     strcpy(file_out, argv[count]);
-                     set_file_out = TRUE;
-                     break;
-           case 'w' : 
-	             count++;
-                     width = atoi(argv[count]);
-                     break;
-           case 'h' :
-	             count++;
-                     height = atoi(argv[count]);
-                     break;
-           default :
-	             printf("Error on command line\n");
-	   }
-	 }
-         else {
-	   printf("Error on command line\n");
-           exit(-1);
-	 }
-    } while (count < argc - 1);
-    if (set_file_in == FALSE) {
-      printf("need input file name\n");
-      exit(-1);
-    }
-    if (set_file_out == FALSE) {
-      printf("need output file name\n");
-      exit(-1);
-    }
-    if ((fp_in = fopen(file_in,"r")) == NULL) {
-        printf("Input file %s not found - aborting\n",file_in);
-        exit(-1);
-    }
-    else 
-        fclose(fp_in);
-    if ((fp_out = fopen(file_out,"w")) == NULL) {
-        printf("Could not open output file %s - aborting\n",file_out);
-        exit(-1);
-    }
-    else 
-        fclose(fp_out);    
-    /* Main image processing here using process_image */
-    printf("Reading from file %s\n",file_in);
-    printf("Writing to file %s\n",file_out); 
-    process_image(pgmfile, file_in, file_out, width, height);
-  }
-  else {
-    printf(" Usage:\n");
-    printf(" process_ -[ip] file_in -o file_out [options]\n");
-    printf("\noptions:\n");
-    printf("\n");
-    printf("needs -[ip] and -o to work\n");
-    printf("use -i for raw images (need height and width)\n");
-    printf("use -p for pgm images\n");
-    exit(-1);
-  }  
-  return 0;
-}
-
-/* open image file from file_in and write it out to file_out */
-void process_image(int pgmfile, char *file_in, char *file_out, int width, int height)
-{
-
-  unsigned char **image_in;  /* specify image array - char image */
-  unsigned char **image_out;  /* specify image array - char image */
-  struct pgmfile pg;
-
-  /* if correct PGM file format  then get height and width */
-
-  if (pgmfile == TRUE) {
-    get_pgm_header(file_in,&pg);
-    height = pg.pgm_height;
-    width = pg.pgm_width;
-  }
-
-  printf("Image size: Height %d Width %d\n",width,height);
-
-  /* allocate memory for image */
-
-  image_in = malloc_char_image(width,height);
-
-  /* if file in PGM format then read info into predefined structure */
-  /* else read raw file */
-  if (pgmfile == TRUE) {
-    read_pgm_image(image_in,file_in,&pg);
-  }
-  else {
-    read_image(image_in,file_in,width,height);
-  }
+  /* 
+      Author: Thushan Perera
+      Email: thushan.perera95@gmail.com
+  */
   
-  image_out = malloc_char_image(width,height);
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <string.h>
+  #include <math.h>
   
-  /** Do the extra processing here */
-  int** mask_one;
-  int** mask_two;
+  #include "pgmfile.h"
+  #include "malloc_image.h"
   
-  mask_one = malloc(2 * sizeof(int*));
-  mask_two = malloc(2 * sizeof(int*));
-  for (int i = 0; i < 2; i++) {
-    mask_one[i] = malloc(2 * sizeof(int));
-    mask_two[i] = malloc(2 * sizeof(int));
-  }
+  #define BLACK 0
+  #define WHITE 255
+  #define FALSE 0
+  #define TRUE !FALSE
+  #define DEFAULT_SIZE 512
   
-  int** smask_one;
-  int** smask_two;
+  void process_image(int, char *, char *, int, int, int);
+  int** convolve(unsigned char**, int**, int, int, int);
   
-  smask_one = malloc(3 * sizeof(int*));
-  smask_two = malloc(3 * sizeof(int*));
-  for (int i = 0; i < 3; i++) {
-    mask_one[i] = malloc(3 * sizeof(int));
-    mask_two[i] = malloc(3 * sizeof(int));
-  }
+  /* get options and input/output filename from user */
   
-  mask_one[0][0] = 1;
-  mask_one[0][1] = 0;
-  mask_one[1][0] = 0;
-  mask_one[1][1] = -1;
-  
-  mask_two[0][0] = 0;
-  mask_two[0][1] = 1;
-  mask_two[1][0] = -1;
-  mask_two[1][1] = 0;
-  
-  
-  printf("f\n");
-  smask_one[0][0] = -1;
-  smask_one[0][1] = 0;
-  smask_one[0][2] = 1;
-  smask_one[1][0] = -2;
-  smask_one[1][1] = 0;
-  smask_one[1][2] = 2;
-  smask_one[2][0] = -1;
-  smask_one[2][1] = 0;
-  smask_one[2][2] = 1;
-  
-  
-  printf("f2\n");
-  smask_two[0][0] = 1;
-  smask_two[0][1] = 2;
-  smask_two[0][2] = 1;
-  smask_two[1][0] = 0;
-  smask_two[1][1] = 0;
-  smask_two[1][2] = 0;
-  smask_two[2][0] = -1;
-  smask_two[2][1] = -2;
-  smask_two[2][2] = -1;
-  
-  // int** nesw = convolve_roberts_cross(image_in, mask_one, width, height);
-  // int** nwse = convolve_roberts_cross(image_in, mask_two, width, height);
-  // int temp;
-  // int threshold = 255;
-
-  // for (int i = 0; i < height; i++) {
-  //   for (int j = 0; j < width; j++) {
-  //      temp = abs(nesw[i][j]) + abs(nwse[i][j]);
-  //      if (temp > threshold) {
-  //        temp = threshold;
-  //      }
-  //      image_out[i][j] = (unsigned char)temp;
-  //   }
-  // }
-  
-  int** nesw = convolve_sobel(image_in, smask_one, width, height);
-  int** nwse = convolve_sobel(image_in, smask_two, width, height);
-  int temp;
-  int threshold = 127;
-
-  for (int i = 0; i < height; i++) {
-    for (int j = 0; j < width; j++) {
-       temp = abs(nesw[i][j]) + abs(nwse[i][j]);
-       if (temp > threshold) {
-         temp = threshold;
-       }
-       image_out[i][j] = (unsigned char)temp;
-    }
-  }
-
-  /* write output image */
-
-  if (pgmfile == TRUE) {
-    write_pgm_image(image_out, file_out, &pg);
-  }
-  else
+  int main(int argc, char *argv[])
   {
-    write_image(image_out, file_out, width, height);
-  }
-}
-
-int** convolve_sobel(unsigned char** image_in, int** mask, int width, int height) {
   
-  /* Copy of input image with extra height and width for working */
-  int** work_image;
+    FILE *fp_in, *fp_out;
+    char *temp, ch;
+    int set_file_in, set_file_out, set_sobel, count;
+    int width, height;
+    char file_in[255], file_out[255];
+    int pgmfile;
   
-  /* Results of convolution will be saved to this 2D array */
-  int** out_image;
+    width = DEFAULT_SIZE;
+    height = DEFAULT_SIZE; 
+    set_file_in = FALSE;
+    set_file_out = FALSE;
   
-  int new_width;
-  int new_height;
-  int temp;
+    pgmfile = FALSE;
   
-  new_width = width + 2;
-  new_height = height + 2;
-  temp = 0; // Temp initialise value
-  
-  /* Allocate memory for workable image */
-  work_image = malloc(new_height * sizeof(int*));
-  for (int i = 0; i < new_height; i++) {
-    work_image[i] = malloc(new_width * sizeof(int));
-  }
-  
-  /* Copy image to workable copy and extend column and row by 1 pixel */
-  for (int i = 0; i < new_height; i++) {
-    for (int j = 0; j < new_width; j++) {
-      
-      if ( (i == height) && (j == width) ) { /* Are we at the bottom right corner? */
-        work_image[i][j] = (int)image_in[i-1][j-1];
-      }
-      else if ( i == height ) { /* Are we at the bottom row? */
-        work_image[i][j] = (int)image_in[i-1][j];
-      }
-      else if ( j == width ) { /* Are we at the far right column? */
-        work_image[i][j] = (int)image_in[i][j-1];
-      }
-      else if ( (i == 0) && (j == 0) ) { /* Are we at the top left corner? */
-        work_image[i][j] = (int)image_in[i+1][j+1];
-      }
-      else if ( i == 0 ) { /* Are we at the top row? */
-        work_image[i][j] = (int)image_in[i+1][j];
-      }
-      else if ( j == 0 ) { /* Are we at the far left column? */
-        work_image[i][j] = (int)image_in[i][j+1];
-      } 
-      else {
-        work_image[i][j] = (int)image_in[i][j];
-      }
-    }
-  }
-  printf("Got here\n");
-  
-  /* Allocate memory for output int** */
-  out_image = malloc(height * sizeof(int*));
-  for (int i = 0; i < height; i++) {
-    out_image[i] = malloc(width * sizeof(int));
-  }
-  
-  for (int i = 0; i < height; i++) {
-    for (int j = 0; j < width; j++) {
-      
-      /* Get pixel and the neighbours and then apply onto the mask matrix */
-      int nw = work_image[i][j];
-      int n = work_image[i][j+1];
-      int ne = work_image[i][j+2];
-      int w = work_image[i+1][j];
-      int c = work_image[i+1][j+1];
-      int e = work_image[i+1][j+2];
-      int sw = work_image[i+2][j];
-      int s = work_image[i+2][j+1];
-      int se = work_image[i+2][j+2];
-      temp = (nw*mask[0][0]) + (n*mask[0][1]) + (ne*mask[0][2])+(w*mask[1][0])+(c*mask[1][1])+(e*mask[1][2])+(sw*mask[2][0])+(s*mask[2][1])+(se*mask[2][2]);
-      out_image[i][j] = temp;
-    }
-  }
-  
-  return out_image;
-}
-
-int** convolve_roberts_cross(unsigned char** image_in, int** mask, int width, int height) {
-  
-  /* Copy of input image with extra height and width for working */
-  int** work_image;
-  
-  /* Results of convolution will be saved to this 2D array */
-  int** out_image;
-  
-  int new_width;
-  int new_height;
-  int temp;
-  
-  new_width = width + 1;
-  new_height = height + 1;
-  temp = 0; // Temp initialise value
-  
-  /* Allocate memory for workable image */
-  work_image = malloc(new_height * sizeof(int*));
-  for (int i = 0; i < new_height; i++) {
-    work_image[i] = malloc(new_width * sizeof(int));
-  }
-  
-  /* Copy image to workable copy and extend column and row by 1 pixel */
-  for (int i = 0; i < new_height; i++) {
-    for (int j = 0; j < new_width; j++) {
-      
-      if ( (i == height) && (j == width) ) { /* Are we at the bottom right corner? */
-        work_image[i][j] = (int)image_in[i-1][j-1];
-      }
-      else if ( i == height ) { /* Are we at the bottom row? */
-        work_image[i][j] = (int)image_in[i-1][j];
-      }
-      else if ( j == width ) { /* Are we at the far right column? */
-        work_image[i][j] = (int)image_in[i][j-1];
-      } 
-      else {
-        work_image[i][j] = (int)image_in[i][j];
+    if (argc > 1) {
+      count = 0;
+      do { 
+          count++;
+          temp = argv[count];
+          if (*argv[count] == '-') {
+            ch = *(++temp);
+            switch (ch) {
+            case 'i' :
+                    count++;
+                      strcpy(file_in, argv[count]);
+                      set_file_in = TRUE;
+                      pgmfile = FALSE;
+                      break;
+            case 'p' :
+                    count++;
+                      strcpy(file_in, argv[count]);
+                      set_file_in = TRUE;
+                      pgmfile = TRUE;
+                      break;
+            case 'o' :
+                    count++;
+                      strcpy(file_out, argv[count]);
+                      set_file_out = TRUE;
+                      break;
+            case 'w' : 
+                count++;
+                      width = atoi(argv[count]);
+                      break;
+            case 'h' :
+                count++;
+                      height = atoi(argv[count]);
+                      break;
+            case 's' :
+                count++;
+                      set_sobel = TRUE;
+                      break;
+            default :
+                printf("Error on command line\n");
       }
     }
+          else {
+      printf("Error on command line\n");
+            exit(-1);
+    }
+      } while (count < argc - 1);
+      if (set_file_in == FALSE) {
+        printf("need input file name\n");
+        exit(-1);
+      }
+      if (set_file_out == FALSE) {
+        printf("need output file name\n");
+        exit(-1);
+      }
+      if ((fp_in = fopen(file_in,"r")) == NULL) {
+          printf("Input file %s not found - aborting\n",file_in);
+          exit(-1);
+      }
+      else 
+          fclose(fp_in);
+      if ((fp_out = fopen(file_out,"w")) == NULL) {
+          printf("Could not open output file %s - aborting\n",file_out);
+          exit(-1);
+      }
+      else 
+          fclose(fp_out);    
+      /* Main image processing here using process_image */
+      printf("Reading from file %s\n",file_in);
+      printf("Writing to file %s\n",file_out); 
+      process_image(pgmfile, file_in, file_out, width, height, set_sobel);
+    }
+    else {
+      printf(" Usage:\n");
+      printf(" process_ -[ip] file_in -o file_out [options]\n");
+      printf("\noptions:\n");
+      printf("\n");
+      printf("needs -[ip] and -o to work\n");
+      printf("use -i for raw images (need height and width)\n");
+      printf("use -p for pgm images\n");
+      exit(-1);
+    }  
+    return 0;
   }
   
-  /* Allocate memory for output int** */
-  out_image = malloc(height * sizeof(int*));
-  for (int i = 0; i < height; i++) {
-    out_image[i] = malloc(width * sizeof(int));
-  }
+  /* open image file from file_in and write it out to file_out */
+  void process_image(int pgmfile, char *file_in, char *file_out, int width, int height, int set_sobel)
+  {
   
-  for (int i = 0; i < height; i++) {
-    for (int j = 0; j < width; j++) {
+    unsigned char **image_in;  /* specify image array - char image */
+    unsigned char **image_out;  /* specify image array - char image */
+    struct pgmfile pg;
+    
+    /* Robert's cross masks */
+    int** mask_one;
+    int** mask_two;
+    
+    /* Sobel masks */
+    int** smask_one;
+    int** smask_two;
+    
+    int** first;
+    int** second;
+    
+    int temp; // Holds current convoluted value
+    int threshold = 127; // Darker images will require lower thresholds
+  
+    /* if correct PGM file format  then get height and width */
+  
+    if (pgmfile == TRUE) {
+      get_pgm_header(file_in,&pg);
+      height = pg.pgm_height;
+      width = pg.pgm_width;
+    }
+  
+    printf("Image size: Height %d Width %d\n",width,height);
+  
+    /* allocate memory for image */
+  
+    image_in = malloc_char_image(width,height);
+  
+    /* if file in PGM format then read info into predefined structure */
+    /* else read raw file */
+    if (pgmfile == TRUE) {
+      read_pgm_image(image_in,file_in,&pg);
+    }
+    else {
+      read_image(image_in,file_in,width,height);
+    }
+    
+    image_out = malloc_char_image(width,height);
+    
+    /** Do the extra processing here */
+    
+    /* Allocate memory for the 2 robert's cross masks */ 
+    mask_one = malloc(2 * sizeof(int*));
+    mask_two = malloc(2 * sizeof(int*));
+    for (int i = 0; i < 2; i++) {
+      mask_one[i] = malloc(2 * sizeof(int));
+      mask_two[i] = malloc(2 * sizeof(int));
+    }
+    
+    /* Allocate memory for the 2 sobel masks */
+    smask_one = malloc(3 * sizeof(int*));
+    smask_two = malloc(3 * sizeof(int*));
+    for (int i = 0; i < 3; i++) {
+      smask_one[i] = malloc(3 * sizeof(int));
+      smask_two[i] = malloc(3 * sizeof(int));
+    }
+    
+    /* Assign values of Robert's cross mask one */
+    mask_one[0][0] = 1;
+    mask_one[0][1] = 0;
+    mask_one[1][0] = 0;
+    mask_one[1][1] = -1;
+    
+    /* Assign values of Robert's cross mask two */
+    mask_two[0][0] = 0;
+    mask_two[0][1] = 1;
+    mask_two[1][0] = -1;
+    mask_two[1][1] = 0;
+    
+    /* Assign values of Sobel vertical mask */
+    smask_one[0][0] = -1;
+    smask_one[0][1] = 0;
+    smask_one[0][2] = 1;
+    smask_one[1][0] = -2;
+    smask_one[1][1] = 0;
+    smask_one[1][2] = 2;
+    smask_one[2][0] = -1;
+    smask_one[2][1] = 0;
+    smask_one[2][2] = 1;
+    
+    /* Assign values of Sobel horizontal mask */
+    smask_two[0][0] = 1;
+    smask_two[0][1] = 2;
+    smask_two[0][2] = 1;
+    smask_two[1][0] = 0;
+    smask_two[1][1] = 0;
+    smask_two[1][2] = 0;
+    smask_two[2][0] = -1;
+    smask_two[2][1] = -2;
+    smask_two[2][2] = -1;
+    
+    if (set_sobel == TRUE) { /* Did user select sobel or not? */
+      printf("\nWill be using Sobel edge detection...\n");
       
-      /* Get pixel and the neighbours and then apply onto the mask matrix */
-      int w = work_image[i][j];
-      int x = work_image[i][j+1];
-      int y = work_image[i+1][j];
-      int z = work_image[i+1][j+1];
-      temp = ( ((w * mask[0][0]) + (z * mask[1][1])) - ((x * mask[0][1]) + (y * mask[1][0])) );
-      out_image[i][j] = temp;
+      first = convolve(image_in, smask_one, 3, width, height);
+      second = convolve(image_in, smask_two, 3, width, height);
+    } else {
+      printf("\nWill be using Robert's Cross edge detection...\n");
+      
+      first = convolve(image_in, mask_one, 2, width, height);
+      second = convolve(image_in, mask_two, 2, width, height);
+    }
+  
+    /* Get convolution result and add them to get the final pixel */
+    for (int i = 0; i < height; i++) {
+      for (int j = 0; j < width; j++) {
+        temp = abs(first[i][j]) + abs(second[i][j]);
+        if (temp > threshold) {
+          temp = threshold;
+        }
+        image_out[i][j] = (unsigned char)temp;
+      }
+    }
+    
+    /* Memory cleanup */
+    free(mask_one);
+    free(mask_two);
+    free(smask_one);
+    free(smask_two);
+    free(first);
+    free(second);
+  
+    /* write output image */
+  
+    if (pgmfile == TRUE) {
+      write_pgm_image(image_out, file_out, &pg);
+    }
+    else
+    {
+      write_image(image_out, file_out, width, height);
     }
   }
   
-  return out_image;
-}
+  /* Given an image and a mask, it will return the convolution result.
+     Note that each mask needs to be sent separately.
+     Also note that this method deals with special edge cases by ignoring a 1 pixel border around the image */
+  int** convolve(unsigned char** image_in, int** mask, int mask_size, int width, int height) {
+    
+    /* Copy of input image with extra height and width for working */
+    int** work_image;
+    
+    /* Results of convolution will be saved to this 2D array */
+    int** out_image;
+    int temp;
+    
+    /* Allocate memory for workable image */
+    work_image = malloc(height * sizeof(int*));
+    for (int i = 0; i < height; i++) {
+      work_image[i] = malloc(width * sizeof(int));
+    }
+    
+    /* Copy contents of input image to the workable copy */
+    for (int i = 0; i < height; i++) {
+      for (int j = 0; j < width; j++) {          
+          work_image[i][j] = (int)image_in[i][j];
+      }
+    }
+    
+    /* Allocate memory for output int** */
+    out_image = malloc(height * sizeof(int*));
+    for (int i = 0; i < height; i++) {
+      out_image[i] = malloc(width * sizeof(int));
+    }
+    
+    /* We will be ignoring the 1 pixel border around image for edge cases */
+    for (int i = 1; i < height-1; i++) {
+      for (int j = 1; j < width-1; j++) {
+        
+        /* Get pixel and the neighbours and then apply onto the mask matrix */
+        
+        if (mask_size == 3) { // Multiplies the 3x3 matrix with a pixel and its 8 neighbours
+          temp = (work_image[i-1][j-1] * mask[0][0]) + (work_image[i-1][j] * mask[0][1]) + 
+                  (work_image[i-1][j+1] * mask[0][2]) + (work_image[i][j-1] * mask[1][0]) + 
+                  (work_image[i][j] * mask[1][1]) + (work_image[i][j+1] * mask[1][2]) + 
+                  (work_image[i+1][j-1] * mask[2][0]) + (work_image[i+1][j] * mask[2][1]) + 
+                  (work_image[i+1][j+1] * mask[2][2]);
+                  
+        } else if (mask_size == 2) { // Multiplies the 2x2 matrix with pixel and its 3 neighbours
+          temp = (work_image[i][j] * mask[0][0]) + (work_image[i+1][j+1] * mask[1][1]) + 
+                  (work_image[i][j+1] * mask[0][1]) + (work_image[i+1][j] * mask[1][0]);
+        }
+        
+        out_image[i][j] = temp;
+      }
+    }
+  
+    free(work_image);
+    
+    return out_image;
+  }

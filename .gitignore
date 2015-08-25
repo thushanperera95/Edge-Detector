@@ -33,3 +33,4 @@
 *.o
 lena3.pgm
 *.o
+*.json
